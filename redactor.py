@@ -1,6 +1,8 @@
 import itertools
 import re
+import sys
 import threading
+from io import BytesIO
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
@@ -508,6 +510,10 @@ def _label_counts(spans: list[PiiSpan]) -> str:
 # --- PDF conversion ---
 
 
+def _is_windows() -> bool:
+    return sys.platform == "win32"
+
+
 def redact_filename(filename: str) -> str:
     stem = Path(filename).stem
     # Redact each " - "-delimited segment on its own so a single-word document
@@ -536,7 +542,19 @@ def _redact_filename_segment(name: str) -> str:
 
 
 def convert_pdf(pdf_path: str, converter) -> str:
-    result = converter.convert(pdf_path)
+    source = pdf_path
+    if _is_windows():
+        # docling-parse passes filesystem paths to native code as UTF-8 bytes.
+        # Windows native path APIs do not reliably interpret those bytes, so
+        # user directories and filenames containing Hungarian characters can
+        # be rejected as invalid documents. A DocumentStream keeps the display
+        # name while letting Python open the Unicode path safely.
+        from docling.datamodel.base_models import DocumentStream
+
+        path = Path(pdf_path)
+        source = DocumentStream(name=path.name, stream=BytesIO(path.read_bytes()))
+
+    result = converter.convert(source)
     return result.document.export_to_markdown()
 
 

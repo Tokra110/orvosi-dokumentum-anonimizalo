@@ -55,3 +55,13 @@ def test_linux_release_runner_installs_qt_egl_runtime():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
 
     assert "sudo apt-get install -y rpm libegl1" in workflow
+
+
+def test_xdg_platform_theme_is_linux_only():
+    entrypoint = (ROOT / "main.py").read_text()
+
+    assert 'if sys.platform.startswith("linux"):' in entrypoint
+    assert (
+        'if sys.platform.startswith("linux"):\n'
+        '    os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")'
+    ) in entrypoint

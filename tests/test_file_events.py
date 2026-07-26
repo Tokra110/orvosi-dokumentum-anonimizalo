@@ -56,3 +56,26 @@ def test_process_file_return_type_unchanged(tmp_path):
     pdf.write_bytes(b"%PDF-1.4\n")
     result = redactor.process_file(str(pdf), EmptyNerPipeline(), FakeConverter(MARKDOWN))
     assert isinstance(result, str)
+
+
+def test_windows_conversion_uses_stream_for_unicode_pdf_path(tmp_path, monkeypatch):
+    pdf = tmp_path / "Takács-Tolnai Dávid lelet.pdf"
+    pdf_bytes = b"%PDF-1.4\nunicode-path-regression"
+    pdf.write_bytes(pdf_bytes)
+
+    class CapturingConverter:
+        source = None
+
+        def convert(self, source):
+            self.source = source
+            return FakeConversion(MARKDOWN)
+
+    from conftest import FakeConversion
+
+    converter = CapturingConverter()
+    monkeypatch.setattr(redactor, "_is_windows", lambda: True)
+
+    redactor.convert_pdf(str(pdf), converter)
+
+    assert converter.source.name == pdf.name
+    assert converter.source.stream.read() == pdf_bytes

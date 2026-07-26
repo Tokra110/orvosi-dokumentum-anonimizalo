@@ -7,7 +7,8 @@ from pathlib import Path
 # Qt's built-in dialog. PySide6 bundles its own Qt, so distro theme plugins
 # like plasma-integration can't load into it; the portal is the
 # desktop-agnostic path. Qt falls back to its own dialog if no portal runs.
-os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication

@@ -135,3 +135,23 @@ def test_onnx_docling_converter_extracts_markdown_table(generated_medical_pdf):
     assert "GGT" in markdown
     assert "Na+" in markdown
     assert "|" in markdown
+
+
+def test_windows_stream_path_converts_unicode_pdf(
+    generated_medical_pdf, tmp_path, monkeypatch
+):
+    import shutil
+
+    import redactor
+
+    unicode_pdf = tmp_path / "Takács-Tolnai Dávid lelet.pdf"
+    shutil.copyfile(generated_medical_pdf, unicode_pdf)
+    monkeypatch.setattr(redactor, "_is_windows", lambda: True)
+
+    markdown = redactor.convert_pdf(
+        str(unicode_pdf), redactor.build_docling_converter()
+    )
+
+    assert "GGT" in markdown
+    assert "Na+" in markdown
+    assert "|" in markdown
