@@ -1,6 +1,6 @@
 # Release pipeline: on a v* tag, build lean bundles (no models — the app
-# downloads them on first run) for Linux (.tar.gz + .rpm) and Windows (.zip),
-# then attach everything to a GitHub Release.
+# downloads them on first run) for Linux (.tar.gz + .rpm) and Windows
+# (installer .exe + portable .zip), then attach everything to a GitHub Release.
 #
 # Inert until this project lives in its own GitHub repository.
 
@@ -52,7 +52,19 @@ jobs:
       - name: Selftest bundle
         shell: bash
         run: ./dist/medical-redactor/medical-redactor.exe --selftest
-      - name: Package
+      - name: Install installer compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}".Substring(1)
+          $numericVersion = ($version -split "-", 2)[0]
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$version" `
+            "/DMyAppNumericVersion=$numericVersion" `
+            "packaging\medical-redactor.iss"
+      - name: Package portable bundle
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -60,7 +72,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
 
   release:
     needs: [linux, windows]

@@ -38,7 +38,7 @@ exe = EXE(
     exclude_binaries=True,
     name="medical-redactor",
     console=False,
-    icon=None,
+    icon="../assets/icon.ico",
 )
 
 coll = COLLECT(
