@@ -36,11 +36,15 @@ def main():
 
 def selftest() -> int:
     """Headless check that a frozen bundle has everything wired: heavy
-    imports resolve, the Docling converter builds, and (if model artifacts
-    are installed) the ONNX NER pipeline runs. No GUI, no display needed."""
+    imports resolve, the Docling PDF parser resources are present, the
+    converter builds, and (if model artifacts are installed) the ONNX NER
+    pipeline runs. No GUI, no display needed."""
+    from docling_parse.pdf_parser import DoclingPdfParser
     from medical_redactor_onnx import paths
     from redactor import build_docling_converter
 
+    DoclingPdfParser()
+    print("selftest: docling PDF parser resources OK")
     build_docling_converter()
     print("selftest: docling converter OK")
     try:

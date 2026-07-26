@@ -13,6 +13,12 @@ def test_pyinstaller_embeds_windows_icon():
     assert (ROOT / "assets" / "icon.ico").is_file()
 
 
+def test_pyinstaller_embeds_docling_pdf_resources():
+    spec = (ROOT / "packaging" / "medical-redactor.spec").read_text()
+
+    assert 'collect_data_files("docling_parse")' in spec
+
+
 def test_inno_installer_has_standard_per_user_behavior():
     installer = (ROOT / "packaging" / "medical-redactor.iss").read_text()
 

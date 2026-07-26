@@ -18,6 +18,10 @@ datas = [
 # lazily (only when a scanned page needs OCR), so nothing pulls it in
 # automatically.
 datas += collect_data_files("rapidocr")
+# docling-parse's compiled PDF parser looks up character maps and encoding
+# tables at runtime. PyInstaller detects the extension module but not these
+# adjacent package resources.
+datas += collect_data_files("docling_parse")
 
 hiddenimports = collect_submodules("rapidocr")
 
