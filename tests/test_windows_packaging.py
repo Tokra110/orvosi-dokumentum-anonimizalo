@@ -36,6 +36,7 @@ def test_inno_installer_has_standard_per_user_behavior():
     assert r'Name: "{autodesktop}\{#MyAppName}"' in installer
     assert "ArchitecturesAllowed=x64compatible" in installer
     assert "ArchitecturesInstallIn64BitMode=x64compatible" in installer
+    assert "VersionInfoProductVersion={#MyAppNumericVersion}" in installer
 
 
 def test_inno_installer_wraps_complete_onedir_bundle():
