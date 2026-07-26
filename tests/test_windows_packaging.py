@@ -49,3 +49,9 @@ def test_release_workflow_does_not_download_models():
 
     assert "models-v1" not in workflow
     assert "MEDICAL_REDACTOR_MODEL_DIR" not in workflow
+
+
+def test_linux_release_runner_installs_qt_egl_runtime():
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+
+    assert "sudo apt-get install -y rpm libegl1" in workflow
