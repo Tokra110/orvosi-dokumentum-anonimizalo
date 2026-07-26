@@ -46,6 +46,10 @@ RestartApplications=no
 Name: "hungarian"; MessagesFile: "compiler:Languages\Hungarian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+english.RemoveDownloadedModelsPrompt=Also remove the downloaded HuBERT and TableFormer models?%n%nChoose No to keep them for a later reinstall.
+hungarian.RemoveDownloadedModelsPrompt=A letöltött HuBERT és TableFormer modellek is törlődjenek?%n%nVálassza a Nem lehetőséget, ha meg szeretné tartani őket egy későbbi újratelepítéshez.
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -61,3 +65,35 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: postinstall nowait skipifsilent
+
+[Code]
+var
+  RemoveDownloadedModels: Boolean;
+
+function InitializeUninstall(): Boolean;
+var
+  Answer: Integer;
+begin
+  Answer := SuppressibleMsgBox(
+    ExpandConstant('{cm:RemoveDownloadedModelsPrompt}'),
+    mbConfirmation,
+    MB_YESNOCANCEL,
+    IDYES
+  );
+  Result := Answer <> IDCANCEL;
+  RemoveDownloadedModels := Answer = IDYES;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usUninstall) and RemoveDownloadedModels then
+  begin
+    DelTree(ExpandConstant('{app}\models'), True, True, True);
+    DelTree(
+      ExpandConstant('{localappdata}\medical-redactor\models'),
+      True,
+      True,
+      True
+    );
+  end;
+end;

@@ -214,4 +214,27 @@ Invoke-InstalledVerification `
     -VerificationDir (Join-Path $root "upgrade-verification") `
     -HfHome $hfHome
 
-Write-Host "Windows fresh-install and previous-version upgrade verification passed"
+# The uninstall prompt defaults to removing models. Silent uninstall suppresses
+# the prompt and selects that default. Prove both current and legacy model
+# locations are deleted while diagnostic logs remain available.
+$legacyModelsDir = Join-Path $env:LOCALAPPDATA "medical-redactor\models"
+New-Item -ItemType Directory -Force $legacyModelsDir | Out-Null
+Set-Content (Join-Path $legacyModelsDir "legacy-model.txt") "legacy model"
+
+$finalUninstaller = Join-Path $defaultInstall "unins000.exe"
+Invoke-CheckedProcess `
+    -FilePath $finalUninstaller `
+    -Arguments @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") `
+    -Description "Final candidate uninstaller"
+
+if (Test-Path $modelsDir) {
+    throw "Candidate uninstaller left downloaded models behind"
+}
+if (Test-Path $legacyModelsDir) {
+    throw "Candidate uninstaller left legacy downloaded models behind"
+}
+if (-not (Test-Path (Join-Path $logsDir "preserve-logs.txt"))) {
+    throw "Candidate uninstaller unexpectedly removed diagnostic logs"
+}
+
+Write-Host "Windows fresh-install, upgrade, and model-removing uninstall verification passed"

@@ -57,6 +57,17 @@ def test_inno_installer_replaces_only_the_immutable_runtime_tree():
     assert r'Type: filesandordirs; Name: "{app}\logs"' not in installer
 
 
+def test_inno_uninstaller_offers_to_remove_downloaded_models_by_default():
+    installer = (ROOT / "packaging" / "medical-redactor.iss").read_text()
+
+    assert "RemoveDownloadedModelsPrompt" in installer
+    assert "MB_YESNOCANCEL" in installer
+    assert "IDYES" in installer
+    assert r"DelTree(ExpandConstant('{app}\models')" in installer
+    assert r"{localappdata}\medical-redactor\models" in installer
+    assert r"DelTree(ExpandConstant('{app}\logs')" not in installer
+
+
 def test_release_workflow_publishes_installer_and_portable_zip():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
 
@@ -88,6 +99,9 @@ def test_windows_installer_verifier_covers_fresh_install_and_real_upgrade():
     assert r"_internal\stale-runtime-file.txt" in script
     assert "preserve-models.txt" in script
     assert "preserve-logs.txt" in script
+    assert "Final candidate uninstaller" in script
+    assert "uninstaller left downloaded models behind" in script
+    assert "uninstaller unexpectedly removed diagnostic logs" in script
     assert "Copy-Item" in script
     assert "Get-Content" in script
 
