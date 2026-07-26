@@ -64,6 +64,36 @@ jobs:
             "/DMyAppVersion=$version" `
             "/DMyAppNumericVersion=$numericVersion" `
             "packaging\medical-redactor.iss"
+      - name: Test installed application
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "Medical Redactor install"
+          $staleFile = Join-Path $installDir "_internal\stale-runtime-file.txt"
+          New-Item -ItemType Directory -Force (Split-Path $staleFile) | Out-Null
+          Set-Content $staleFile "old runtime"
+
+          $installer = Get-ChildItem "dist\*-setup.exe" | Select-Object -First 1
+          $install = Start-Process -FilePath $installer.FullName `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+              "/DIR=`"$installDir`"") `
+            -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Installer exited with code $($install.ExitCode)"
+          }
+          if (Test-Path $staleFile) {
+            throw "Installer did not replace the old runtime tree"
+          }
+
+          $resource = Join-Path $installDir `
+            "_internal\docling_parse\pdf_resources\glyphs\standard\additional.dat"
+          if (-not (Test-Path $resource)) {
+            throw "Installed Docling PDF resource is missing: $resource"
+          }
+
+          & (Join-Path $installDir "medical-redactor.exe") --selftest
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installed application self-test exited with code $LASTEXITCODE"
+          }
       - name: Package portable bundle
         shell: bash
         run: |

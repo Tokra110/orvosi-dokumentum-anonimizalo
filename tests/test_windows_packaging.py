@@ -40,6 +40,15 @@ def test_inno_installer_wraps_complete_onedir_bundle():
     assert r'Filename: "{app}\{#MyAppExeName}"' in installer
 
 
+def test_inno_installer_replaces_only_the_immutable_runtime_tree():
+    installer = (ROOT / "packaging" / "medical-redactor.iss").read_text()
+
+    assert "[InstallDelete]" in installer
+    assert r'Type: filesandordirs; Name: "{app}\_internal"' in installer
+    assert r'Type: filesandordirs; Name: "{app}\models"' not in installer
+    assert r'Type: filesandordirs; Name: "{app}\logs"' not in installer
+
+
 def test_release_workflow_publishes_installer_and_portable_zip():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
 
@@ -48,6 +57,14 @@ def test_release_workflow_publishes_installer_and_portable_zip():
     assert "packaging\\medical-redactor.iss" in workflow
     assert "dist/*-setup.exe" in workflow
     assert "dist/*.zip" in workflow
+
+
+def test_release_workflow_tests_the_installed_windows_application():
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+
+    assert "Test installed application" in workflow
+    assert 'medical-redactor.exe") --selftest' in workflow
+    assert "pdf_resources\\glyphs\\standard\\additional.dat" in workflow
 
 
 def test_release_workflow_does_not_download_models():
