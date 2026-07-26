@@ -8,7 +8,7 @@ models are fetched by docling itself into the Hugging Face cache.
 Build:  .venv/bin/pyinstaller packaging/medical-redactor.spec --noconfirm
 """
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 datas = [
     ("../models_manifest.json", "."),
@@ -22,8 +22,12 @@ datas += collect_data_files("rapidocr")
 # tables at runtime. PyInstaller detects the extension module but not these
 # adjacent package resources.
 datas += collect_data_files("docling_parse")
+# Docling discovers its built-in model factories through the `docling`
+# package entry point declared by the docling-slim distribution.
+datas += copy_metadata("docling-slim")
 
 hiddenimports = collect_submodules("rapidocr")
+hiddenimports += ["docling.models.plugins.defaults"]
 
 a = Analysis(
     ["../main.py"],

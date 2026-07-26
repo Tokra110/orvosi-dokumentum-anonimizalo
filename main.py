@@ -40,10 +40,17 @@ def selftest() -> int:
     builds, and (if model artifacts are installed) the ONNX NER pipeline
     runs. No GUI, no display needed."""
     from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PictureDescriptionVlmEngineOptions
+    from docling.models.factories import get_picture_description_factory
     from medical_redactor_onnx import paths
     from redactor import build_docling_converter
 
     converter = build_docling_converter()
+    picture_factory = get_picture_description_factory()
+    if PictureDescriptionVlmEngineOptions not in picture_factory.classes:
+        raise RuntimeError("docling built-in plugin registry is incomplete")
+    print("selftest: docling plugin registry OK")
+
     pdf_backend = converter.format_to_options[InputFormat.PDF].backend
     if sys.platform.startswith("win"):
         from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend

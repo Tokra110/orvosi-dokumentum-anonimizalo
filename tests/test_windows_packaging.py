@@ -19,6 +19,13 @@ def test_pyinstaller_embeds_docling_pdf_resources():
     assert 'collect_data_files("docling_parse")' in spec
 
 
+def test_pyinstaller_embeds_docling_plugin_registration():
+    spec = (ROOT / "packaging" / "medical-redactor.spec").read_text()
+
+    assert 'copy_metadata("docling-slim")' in spec
+    assert '"docling.models.plugins.defaults"' in spec
+
+
 def test_inno_installer_has_standard_per_user_behavior():
     installer = (ROOT / "packaging" / "medical-redactor.iss").read_text()
 
@@ -72,6 +79,8 @@ def test_windows_selftest_requires_pdfium_backend():
 
     assert "unexpected Windows PDF backend" in entrypoint
     assert "selftest: Windows PDFium backend OK" in entrypoint
+    assert "PictureDescriptionVlmEngineOptions" in entrypoint
+    assert "docling plugin registry OK" in entrypoint
 
 
 def test_release_workflow_does_not_download_models():
