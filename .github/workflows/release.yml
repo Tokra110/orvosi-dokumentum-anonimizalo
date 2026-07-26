@@ -1,0 +1,78 @@
+# Release pipeline: on a v* tag, build lean bundles (no models — the app
+# downloads them on first run) for Linux (.tar.gz + .rpm) and Windows (.zip),
+# then attach everything to a GitHub Release.
+#
+# Inert until this project lives in its own GitHub repository.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install build deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y rpm
+          pip install -r requirements-build.txt
+      - name: Build bundle
+        run: pyinstaller packaging/medical-redactor.spec --noconfirm
+      - name: Selftest bundle
+        run: ./dist/medical-redactor/medical-redactor --selftest
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          tar -C dist -czf "dist/medical-redactor-$VERSION-linux-x86_64.tar.gz" medical-redactor
+          bash packaging/build_rpm.sh "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.tar.gz
+            dist/*.rpm
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install build deps
+        run: pip install -r requirements-build.txt
+      - name: Build bundle
+        run: pyinstaller packaging/medical-redactor.spec --noconfirm
+      - name: Selftest bundle
+        shell: bash
+        run: ./dist/medical-redactor/medical-redactor.exe --selftest
+      - name: Package
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist && 7z a "medical-redactor-$VERSION-windows-x86_64.zip" medical-redactor
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

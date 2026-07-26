@@ -1,0 +1,13 @@
+# format-* extras look PDF-irrelevant but are required: docling's
+# document_converter.py unconditionally imports every format backend.
+docling-slim[convert-core,format-html,format-latex,format-markdown,format-office,format-pdf,feat-ocr-rapidocr-onnx]>=2.96,<2.97
+onnxruntime>=1.20,<1.24
+tokenizers>=0.20,<1
+# Our NER no longer uses transformers (tokenizers-only), but docling-slim's
+# ONNX layout engine imports transformers.AutoImageProcessor at conversion
+# time without declaring the dependency. Hostage until upstream drops it.
+transformers>=4.40,<5
+numpy<3
+PySide6-Essentials>=6.7,<7
+reportlab>=4
+pytest>=8

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Orvosi dokumentum anonimizáló
+Name[en]=Medical Document Anonymizer
+Comment=Redact PII from Hungarian medical PDFs
+Exec=/usr/bin/medical-redactor
+Icon=medical-redactor
+Terminal=false
+Type=Application
+Categories=Office;Utility;
