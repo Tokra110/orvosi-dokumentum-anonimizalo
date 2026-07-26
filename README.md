@@ -56,6 +56,8 @@ python scripts/export_tableformer_onnx.py
 
 `packaging/` holds the PyInstaller, RPM, and Inno Setup definitions. `.github/workflows/release.yml` builds Linux (tar.gz + rpm) and Windows artifacts on version tags. Windows users can choose the standard per-user installer (`*-setup.exe`) or a portable zip. The installer adds a Start menu shortcut, supports normal Windows uninstall, and optionally creates a desktop shortcut. Bundles ship without models; the in-app downloader fetches them on first run. On Windows, downloaded models and diagnostic logs live beside the installed executable under `models\` and `logs\`. Versions installed before 0.1.4 automatically move existing models from the previous per-user data directory.
 
+Before publishing, the Windows release gate installs the candidate, downloads and hashes the real HuBERT and TableFormer models, starts from an empty Docling cache, processes a vector PDF with a table and an image-only OCR PDF, checks the redacted contents and filenames, opens the real Qt window, then upgrades the previous published installer and repeats the verification while confirming that models and logs survived. A manual workflow run performs the same Windows check without publishing anything.
+
 ## Model attribution
 
 The app runs third-party models. The weights are not ours and keep their original licenses:

@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 from pathlib import Path
 
 # Route file dialogs through the XDG desktop portal so the desktop's own
@@ -80,4 +81,15 @@ def selftest() -> int:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         sys.exit(selftest())
+    if "--release-verify" in sys.argv:
+        logger = logging.getLogger("release_verification")
+        try:
+            argument_index = sys.argv.index("--release-verify") + 1
+            work_dir = Path(sys.argv[argument_index])
+            from release_harness import run_release_verification
+
+            sys.exit(run_release_verification(work_dir))
+        except Exception:
+            logger.exception("Installed release verification failed")
+            raise
     main()

@@ -17,6 +17,9 @@ bash setup.sh
 # headless sanity check (heavy imports + converter build + NER if models present)
 .venv/bin/python main.py --selftest
 
+# full release verification (downloads/verifies models, vector + OCR PDFs, GUI)
+xvfb-run -a .venv/bin/python main.py --release-verify /tmp/medical-redactor-release-check
+
 # regenerate models_manifest.json (per-file bytes+sha256) after re-exporting models;
 # provide a release URL only when model hosting is explicitly restored
 .venv/bin/python scripts/make_models_manifest.py \
@@ -43,6 +46,7 @@ python scripts/export_hubert_onnx.py
 
 ```
 main.py                  -- thin Qt entry point (QApplication + icon + QSS) and --selftest
+release_harness.py       -- installed release gate: model hashes, vector/OCR PDFs, GUI smoke
 gui/                     -- PySide6 UI package
   main_window.py         --   queue-based main window: add files/folder, start/stop,
                          --   output-mode menu, model-status chip, manual redact card, log,
@@ -61,8 +65,9 @@ models_manifest.json     -- per-file {name, bytes, sha256} + per-model base_url 
 models/                  -- gitignored local model artifacts
 onnx-tableformer/        -- spike-era exporter source (loaded by scripts/export_tableformer_onnx.py)
 scripts/                 -- export_*.py (torch, export venv only) + make_models_manifest.py
+  verify_windows_installer.ps1 -- fresh install + previous-release upgrade verification
 packaging/               -- PyInstaller spec, rpm spec + build script, system .desktop file
-.github/workflows/       -- release.yml: Linux tar.gz+rpm, Windows zip on v* tags
+.github/workflows/       -- release.yml: manual Windows candidate + tag-gated release
 setup.sh                 -- creates .venv, installs runtime deps, verifies artifacts + dependency hygiene
 requirements.txt         -- torch-free runtime deps
 requirements-export.txt  -- export-time deps that may pull torch
@@ -104,6 +109,7 @@ Per-file processing order:
 - **Torch-free runtime split**: runtime installs `docling-slim` + `onnxruntime` only. Export scripts are separate and may use torch to regenerate ONNX artifacts.
 - **Local model artifacts**: generated files live under `models/tableformer-onnx/` and `models/hubert-ner-onnx/`; `models/` is gitignored except `.gitkeep`. Frozen Windows bundles keep models beside the executable because the installer uses the writable per-user `%LOCALAPPDATA%\Programs\Medical Redactor` location. The first run migrates models from the older `%LOCALAPPDATA%\medical-redactor\models` location. Frozen Linux bundles continue using `~/.local/share/medical-redactor/models` because RPM installation directories are read-only.
 - **Lean release strategy**: release artifacts ship without models (~700 MB onedir vs ~1.4 GB); users fetch models via the in-app downloader on first run. Docling fetches its own layout/OCR models into the HF cache.
+- **Full Windows release gate**: manual `release.yml` runs build and verify a non-publishing Windows candidate. Tag runs repeat the same gate before publication. The installed candidate downloads and hashes the real app models, starts with an empty Docling cache, processes a Unicode-named vector table PDF and an image-only OCR PDF, validates redacted content and filenames, opens the real Qt window, then upgrades the previous published installer and repeats the check while preserving models and logs. Do not replace this with the lightweight `--selftest`.
 - **Docling shims**: `install_docling_torch_free_shims()` disables optional torch-backed chart extraction, replaces Docling's torch-based device resolver with CPU, and supplies minimal reading-order/list-item shims so `docling-ibm-models` is not imported at runtime.
 
 ## Hungarian PII patterns

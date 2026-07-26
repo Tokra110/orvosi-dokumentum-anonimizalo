@@ -1,17 +1,17 @@
-# Release pipeline: on a v* tag, build lean bundles (no models — the app
-# downloads them on first run) for Linux (.tar.gz + .rpm) and Windows
-# (installer .exe + portable .zip), then attach everything to a GitHub Release.
-#
-# Inert until this project lives in its own GitHub repository.
+# Manual runs build and fully verify a non-publishing Windows candidate.
+# On a v* tag, the same Windows gate plus Linux packaging must pass before
+# lean bundles are attached to a GitHub Release.
 
 name: release
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
 
 jobs:
   linux:
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +39,7 @@ jobs:
             dist/*.rpm
 
   windows:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,45 +56,41 @@ jobs:
       - name: Install installer compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
+      - name: Resolve candidate version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          else {
+            $version = "9999.0.0-candidate.$env:GITHUB_RUN_NUMBER"
+          }
+          $numericVersion = ($version -split "-", 2)[0]
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "numeric=$numericVersion" >> $env:GITHUB_OUTPUT
       - name: Build installer
         shell: pwsh
         run: |
-          $version = "${env:GITHUB_REF_NAME}".Substring(1)
-          $numericVersion = ($version -split "-", 2)[0]
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
-            "/DMyAppVersion=$version" `
-            "/DMyAppNumericVersion=$numericVersion" `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}" `
+            "/DMyAppNumericVersion=${{ steps.version.outputs.numeric }}" `
             "packaging\medical-redactor.iss"
-      - name: Test installed application
+      - name: Verify installed Windows application
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          $installDir = Join-Path $env:RUNNER_TEMP "Medical Redactor install"
-          $staleFile = Join-Path $installDir "_internal\stale-runtime-file.txt"
-          New-Item -ItemType Directory -Force (Split-Path $staleFile) | Out-Null
-          Set-Content $staleFile "old runtime"
-
           $installer = Get-ChildItem "dist\*-setup.exe" | Select-Object -First 1
-          $install = Start-Process -FilePath $installer.FullName `
-            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-              "/DIR=`"$installDir`"") `
-            -Wait -PassThru
-          if ($install.ExitCode -ne 0) {
-            throw "Installer exited with code $($install.ExitCode)"
-          }
-          if (Test-Path $staleFile) {
-            throw "Installer did not replace the old runtime tree"
-          }
-
-          $app = Join-Path $installDir "medical-redactor.exe"
-          $selftest = Start-Process -FilePath $app -ArgumentList "--selftest" `
-            -Wait -PassThru
-          if ($selftest.ExitCode -ne 0) {
-            throw "Installed application self-test exited with code $($selftest.ExitCode)"
-          }
+          .\scripts\verify_windows_installer.ps1 `
+            -CandidateInstaller $installer.FullName `
+            -Repository "${{ github.repository }}" `
+            -WorkRoot (Join-Path $env:RUNNER_TEMP "medical-redactor-full-verification")
       - name: Package portable bundle
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           cd dist && 7z a "medical-redactor-$VERSION-windows-x86_64.zip" medical-redactor
       - uses: actions/upload-artifact@v4
         with:
@@ -104,6 +101,10 @@ jobs:
 
   release:
     needs: [linux, windows]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.linux.result == 'success' &&
+      needs.windows.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

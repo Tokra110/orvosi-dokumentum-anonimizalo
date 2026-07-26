@@ -69,9 +69,38 @@ def test_release_workflow_publishes_installer_and_portable_zip():
 def test_release_workflow_tests_the_installed_windows_application():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
 
-    assert "Test installed application" in workflow
-    assert "Start-Process -FilePath $app" in workflow
-    assert "$selftest.ExitCode" in workflow
+    assert "Verify installed Windows application" in workflow
+    assert "scripts\\verify_windows_installer.ps1" in workflow
+    assert "-CandidateInstaller" in workflow
+
+
+def test_windows_installer_verifier_covers_fresh_install_and_real_upgrade():
+    verifier = ROOT / "scripts" / "verify_windows_installer.ps1"
+
+    assert verifier.is_file()
+    script = verifier.read_text()
+    assert "--release-verify" in script
+    assert "fresh-install" in script
+    assert "releases/latest" in script
+    assert "*-setup.exe" in script
+    assert "release-verification.json" in script
+    assert r"_internal\stale-runtime-file.txt" in script
+    assert "preserve-models.txt" in script
+    assert "preserve-logs.txt" in script
+    assert "Copy-Item" in script
+    assert "Get-Content" in script
+
+
+def test_release_workflow_has_non_publishing_full_windows_candidate_gate():
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+
+    assert "workflow_dispatch:" in workflow
+    assert "github.event_name == 'workflow_dispatch'" in workflow
+    assert "scripts\\verify_windows_installer.ps1" in workflow
+    assert "9999.0.0-candidate." in workflow
+    assert "startsWith(github.ref, 'refs/tags/v')" in workflow
+    assert "needs.windows.result == 'success'" in workflow
+    assert "needs.linux.result == 'success'" in workflow
 
 
 def test_windows_selftest_requires_pdfium_backend():
