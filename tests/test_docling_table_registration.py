@@ -127,6 +127,21 @@ def test_redactor_build_docling_converter_uses_onnx_layout_options():
     assert options.ocr_options.backend == "onnxruntime"
 
 
+def test_windows_converter_uses_pdfium_backend(monkeypatch):
+    from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+    from docling.datamodel.base_models import InputFormat
+
+    import redactor
+
+    monkeypatch.setattr(redactor, "_is_windows", lambda: True)
+    converter = redactor.build_docling_converter()
+
+    assert (
+        converter.format_to_options[InputFormat.PDF].backend
+        is PyPdfiumDocumentBackend
+    )
+
+
 def test_onnx_docling_converter_extracts_markdown_table(generated_medical_pdf):
     from redactor import build_docling_converter, convert_pdf
 

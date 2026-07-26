@@ -612,9 +612,22 @@ def build_docling_converter():
     )
     pipeline_options.ocr_options = RapidOcrOptions(backend="onnxruntime", lang=["english"])
 
+    pdf_format_option = PdfFormatOption(pipeline_options=pipeline_options)
+    if _is_windows():
+        # The docling-parse backend depends on a large external resource tree.
+        # An external glyph map has repeatedly been unavailable on a real
+        # Windows installation even when the installer verified it. PDFium is
+        # already bundled, supports Unicode streams, and needs no such files.
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+
+        pdf_format_option = PdfFormatOption(
+            pipeline_options=pipeline_options,
+            backend=PyPdfiumDocumentBackend,
+        )
+
     return DocumentConverter(
         format_options={
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+            InputFormat.PDF: pdf_format_option,
         }
     )
 

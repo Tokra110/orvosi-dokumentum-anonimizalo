@@ -65,7 +65,13 @@ def test_release_workflow_tests_the_installed_windows_application():
     assert "Test installed application" in workflow
     assert "Start-Process -FilePath $app" in workflow
     assert "$selftest.ExitCode" in workflow
-    assert "pdf_resources\\glyphs\\standard\\additional.dat" in workflow
+
+
+def test_windows_selftest_requires_pdfium_backend():
+    entrypoint = (ROOT / "main.py").read_text()
+
+    assert "unexpected Windows PDF backend" in entrypoint
+    assert "selftest: Windows PDFium backend OK" in entrypoint
 
 
 def test_release_workflow_does_not_download_models():

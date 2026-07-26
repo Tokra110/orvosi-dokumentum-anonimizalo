@@ -36,16 +36,26 @@ def main():
 
 def selftest() -> int:
     """Headless check that a frozen bundle has everything wired: heavy
-    imports resolve, the Docling PDF parser resources are present, the
-    converter builds, and (if model artifacts are installed) the ONNX NER
-    pipeline runs. No GUI, no display needed."""
-    from docling_parse.pdf_parser import DoclingPdfParser
+    imports resolve, the platform PDF backend initializes, the converter
+    builds, and (if model artifacts are installed) the ONNX NER pipeline
+    runs. No GUI, no display needed."""
+    from docling.datamodel.base_models import InputFormat
     from medical_redactor_onnx import paths
     from redactor import build_docling_converter
 
-    DoclingPdfParser()
-    print("selftest: docling PDF parser resources OK")
-    build_docling_converter()
+    converter = build_docling_converter()
+    pdf_backend = converter.format_to_options[InputFormat.PDF].backend
+    if sys.platform.startswith("win"):
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+
+        if pdf_backend is not PyPdfiumDocumentBackend:
+            raise RuntimeError(f"unexpected Windows PDF backend: {pdf_backend}")
+        print("selftest: Windows PDFium backend OK")
+    else:
+        from docling_parse.pdf_parser import DoclingPdfParser
+
+        DoclingPdfParser()
+        print("selftest: docling PDF parser resources OK")
     print("selftest: docling converter OK")
     try:
         model_dir = paths.hubert_ner_dir(require=True)

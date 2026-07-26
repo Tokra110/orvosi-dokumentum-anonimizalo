@@ -84,12 +84,6 @@ jobs:
             throw "Installer did not replace the old runtime tree"
           }
 
-          $resource = Join-Path $installDir `
-            "_internal\docling_parse\pdf_resources\glyphs\standard\additional.dat"
-          if (-not (Test-Path $resource)) {
-            throw "Installed Docling PDF resource is missing: $resource"
-          }
-
           $app = Join-Path $installDir "medical-redactor.exe"
           $selftest = Start-Process -FilePath $app -ArgumentList "--selftest" `
             -Wait -PassThru
