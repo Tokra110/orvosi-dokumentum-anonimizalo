@@ -63,7 +63,8 @@ def test_release_workflow_tests_the_installed_windows_application():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
 
     assert "Test installed application" in workflow
-    assert 'medical-redactor.exe") --selftest' in workflow
+    assert "Start-Process -FilePath $app" in workflow
+    assert "$selftest.ExitCode" in workflow
     assert "pdf_resources\\glyphs\\standard\\additional.dat" in workflow
 
 

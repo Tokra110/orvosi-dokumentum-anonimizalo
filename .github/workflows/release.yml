@@ -90,9 +90,11 @@ jobs:
             throw "Installed Docling PDF resource is missing: $resource"
           }
 
-          & (Join-Path $installDir "medical-redactor.exe") --selftest
-          if ($LASTEXITCODE -ne 0) {
-            throw "Installed application self-test exited with code $LASTEXITCODE"
+          $app = Join-Path $installDir "medical-redactor.exe"
+          $selftest = Start-Process -FilePath $app -ArgumentList "--selftest" `
+            -Wait -PassThru
+          if ($selftest.ExitCode -ne 0) {
+            throw "Installed application self-test exited with code $($selftest.ExitCode)"
           }
       - name: Package portable bundle
         shell: bash
