@@ -18,9 +18,9 @@ bash setup.sh
 .venv/bin/python main.py --selftest
 
 # regenerate models_manifest.json (per-file bytes+sha256) after re-exporting models;
-# models are hosted flat on the GitHub models-v1 release (bump the tag when weights change)
+# provide a release URL only when model hosting is explicitly restored
 .venv/bin/python scripts/make_models_manifest.py \
-  --base-url https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/download/models-v1
+  --base-url <release-base-url>
 
 # release build (lean bundle, no models; see packaging/)
 .venv/bin/pip install -r requirements-build.txt
@@ -32,6 +32,12 @@ bash packaging/build_rpm.sh 0.1.0
 python scripts/export_tableformer_onnx.py
 python scripts/export_hubert_onnx.py
 ```
+
+## Repository lifecycle
+
+- Repository name: `orvosi-dokumentum-anonimizalo`.
+- The GitHub remote was intentionally deleted on 2026-07-26. Do not create a remote, push commits, or publish model releases unless the user explicitly asks.
+- When the user explicitly requests a new remote, recreate it with the repository name above and then configure a new model-release URL.
 
 ## Architecture
 

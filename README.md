@@ -25,7 +25,7 @@ Minden a saját gépeden fut, CPU-n (ONNX Runtime, se PyTorch, se felhő). A dok
 
 Desktop app (PySide6) that converts Hungarian medical PDFs to redacted markdown. PII detection runs in two layers: a Hungarian HuBERT NER model (ONNX) plus Hungarian-specific regexes. Inference is local, CPU-only, torch-free.
 
-The app works and has tests, but treat it as a work in progress. Models are downloaded in-app from the [`models-v1` release](https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/tag/models-v1). Validation so far covers EESZT documents only (see the Hungarian note above).
+The app works and has tests, but treat it as a work in progress. Model downloads are intentionally not configured while the project has no remote repository. Validation so far covers EESZT documents only (see the Hungarian note above).
 
 ## Pipeline
 
@@ -43,7 +43,7 @@ bash setup.sh                 # creates .venv, installs torch-free runtime deps
 .venv/bin/python main.py
 ```
 
-Model artifacts (about 655 MB: HuBERT NER + TableFormer as ONNX) are not tracked in git. On first launch, open the model dialog (status chip in the header) and download them. They come from the [`models-v1` release](https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/tag/models-v1) and are sha256-verified against `models_manifest.json`.
+Model artifacts (about 655 MB: HuBERT NER + TableFormer as ONNX) are not tracked in git. The in-app downloader is intentionally unconfigured until a remote model release is explicitly created. Local artifacts are sha256-verified against `models_manifest.json`.
 
 You can also regenerate them locally with the export scripts. That needs a separate venv from `requirements-export.txt`, which pulls torch:
 

@@ -4,7 +4,6 @@
       "name": "hubert-ner-onnx",
       "description": "Hungarian HuBERT NER (ONNX, fp32)",
       "approx_size_mb": 441,
-      "base_url": "https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/download/models-v1",
       "files": [
         {
           "name": "model.onnx",
@@ -47,7 +46,6 @@
       "name": "tableformer-onnx",
       "description": "Docling TableFormer table structure (ONNX)",
       "approx_size_mb": 214,
-      "base_url": "https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/download/models-v1",
       "files": [
         {
           "name": "encoder.onnx",
