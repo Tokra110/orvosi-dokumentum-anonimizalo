@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+import logging
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR_ENV = "MEDICAL_REDACTOR_MODEL_DIR"
+_LOGGER = logging.getLogger(__name__)
 
 
 def _user_data_dir() -> Path:
@@ -45,8 +48,19 @@ def get_model_dir() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     if getattr(sys, "frozen", False):
-        # Installed bundle: the app dir is read-only, so downloaded models
-        # go to the per-user data dir instead.
+        if sys.platform == "win32":
+            target = Path(sys.executable).resolve().parent / "models"
+            legacy = _user_data_dir() / "models"
+            if legacy.is_dir() and not target.exists():
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(legacy), str(target))
+                    _LOGGER.info("Migrated legacy model directory beside the executable")
+                except OSError:
+                    _LOGGER.exception("Could not migrate the legacy model directory")
+                    return legacy
+            return target
+        # System-wide Linux bundles keep mutable models in per-user data.
         return _user_data_dir() / "models"
     return PROJECT_ROOT / "models"
 

@@ -1,3 +1,5 @@
+import logging
+
 import redactor
 from redactor import FileEvent, process_pdfs
 
@@ -47,6 +49,18 @@ def test_process_pdfs_emits_failed_event_on_error(tmp_path, monkeypatch):
 
     assert [e.stage for e in events] == ["converting", "failed"]
     assert "boom" in events[-1].error
+
+
+def test_process_pdfs_records_failure_traceback(tmp_path, monkeypatch, caplog):
+    class BrokenConverter:
+        def convert(self, path):
+            raise RuntimeError("backend detail")
+
+    with caplog.at_level(logging.ERROR):
+        _run(tmp_path, monkeypatch, BrokenConverter())
+
+    assert "PDF processing failed" in caplog.text
+    assert "backend detail" in caplog.text
 
 
 def test_process_file_return_type_unchanged(tmp_path):

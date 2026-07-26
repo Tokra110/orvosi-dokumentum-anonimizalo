@@ -1,4 +1,5 @@
 import itertools
+import logging
 import re
 import sys
 import threading
@@ -6,6 +7,8 @@ from io import BytesIO
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
+
+_LOGGER = logging.getLogger(__name__)
 
 PLACEHOLDER_MAP = {
     "NAME": "[REDACTED_NAME]",
@@ -552,9 +555,29 @@ def convert_pdf(pdf_path: str, converter) -> str:
         from docling.datamodel.base_models import DocumentStream
 
         path = Path(pdf_path)
-        source = DocumentStream(name=path.name, stream=BytesIO(path.read_bytes()))
+        pdf_bytes = path.read_bytes()
+        _LOGGER.info(
+            "PDF preflight: bytes=%d header=%r file=%s",
+            len(pdf_bytes),
+            pdf_bytes[:8],
+            path.name,
+        )
+        try:
+            import pypdfium2 as pdfium
 
+            probe = pdfium.PdfDocument(BytesIO(pdf_bytes))
+            try:
+                _LOGGER.info("PDFium preflight: pages=%d", len(probe))
+            finally:
+                probe.close()
+        except Exception:
+            _LOGGER.exception("PDFium preflight failed")
+
+        source = DocumentStream(name=path.name, stream=BytesIO(pdf_bytes))
+
+    _LOGGER.info("Starting Docling conversion with source type %s", type(source).__name__)
     result = converter.convert(source)
+    _LOGGER.info("Docling conversion completed")
     return result.document.export_to_markdown()
 
 
@@ -741,6 +764,9 @@ def process_pdfs(
     pdfs = [Path(p) for p in pdf_paths]
 
     if log:
+        from diagnostics import display_log_path
+
+        log(f"Detailed diagnostic log: {display_log_path()}")
         log(f"Processing {len(pdfs)} PDF(s). Loading Docling converter...")
 
     converter = build_docling_converter()
@@ -788,6 +814,7 @@ def process_pdfs(
                     path=str(pdf), stage="done", counts=counts, output_name=out_file.name
                 ))
         except Exception as e:
+            _LOGGER.exception("PDF processing failed: %s", pdf.name)
             if log:
                 log(f"  ERROR processing {pdf.name}: {e}\n")
             if on_file_event:

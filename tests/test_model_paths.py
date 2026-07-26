@@ -78,19 +78,44 @@ def test_hubert_ner_dir_requires_expected_files(monkeypatch, tmp_path):
     assert hubert_ner_dir(require=True) == tmp_path / "hubert-ner-onnx"
 
 
-def test_frozen_app_uses_user_data_dir(tmp_path, monkeypatch):
+def test_frozen_non_windows_app_uses_user_data_dir(tmp_path, monkeypatch):
     import sys
 
     from medical_redactor_onnx import paths
 
     monkeypatch.delenv(paths.MODEL_DIR_ENV, raising=False)
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    if sys.platform == "win32":
-        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     result = paths.get_model_dir()
     assert result == tmp_path / "medical-redactor" / "models"
+
+
+def test_frozen_windows_models_live_beside_executable_and_migrate(
+    tmp_path, monkeypatch
+):
+    import sys
+
+    from medical_redactor_onnx import paths
+
+    install_dir = tmp_path / "Programs" / "Medical Redactor"
+    executable = install_dir / "medical-redactor.exe"
+    legacy_models = tmp_path / "medical-redactor" / "models"
+    (legacy_models / "hubert-ner-onnx").mkdir(parents=True)
+    (legacy_models / "hubert-ner-onnx" / "model.onnx").write_bytes(b"model")
+
+    monkeypatch.delenv(paths.MODEL_DIR_ENV, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "executable", str(executable))
+
+    result = paths.get_model_dir()
+
+    assert result == install_dir / "models"
+    assert (result / "hubert-ner-onnx" / "model.onnx").read_bytes() == b"model"
+    assert not legacy_models.exists()
 
 
 def test_env_override_beats_frozen(tmp_path, monkeypatch):

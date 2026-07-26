@@ -1,8 +1,11 @@
 """Background thread running the redaction pipeline with Qt signals."""
 
+import logging
 import threading
 
 from PySide6.QtCore import QThread, Signal
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RedactionWorker(QThread):
@@ -34,4 +37,5 @@ class RedactionWorker(QThread):
                 ),
             )
         except Exception as e:
+            _LOGGER.exception("Redaction worker failed")
             self.log_line.emit(f"FATAL ERROR: {e}")

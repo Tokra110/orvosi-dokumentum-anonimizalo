@@ -10,6 +10,10 @@ from pathlib import Path
 if sys.platform.startswith("linux"):
     os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
 
+from diagnostics import configure_file_logging
+
+configure_file_logging()
+
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 

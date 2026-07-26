@@ -25,6 +25,27 @@ def update_config(**changes) -> dict:
 
 
 def sanitize_log(msg: str) -> str:
+    msg = re.sub(
+        r"(?i)([A-Z]:\\Users\\)[^\\\r\n]+",
+        lambda m: f"{m.group(1)}***",
+        msg,
+    )
+    msg = re.sub(
+        r"""(?i)(['"])[^'"\r\n]*\.(pdf|md)\1""",
+        lambda m: f"{m.group(1)}XYZ.{m.group(2).lower()}{m.group(1)}",
+        msg,
+    )
+    msg = re.sub(
+        r"""(?i)(?<=[/\\])[^/\\'"\r\n]*\.(pdf|md)\b""",
+        lambda m: f"XYZ.{m.group(1).lower()}",
+        msg,
+    )
+    for prefix in ("Converting ", "processing ", "document ", "open "):
+        msg = re.sub(
+            rf"(?i)(?<=\b{re.escape(prefix)}).*?\.pdf\b",
+            "XYZ.pdf",
+            msg,
+        )
     msg = re.sub(r"['\"]?/[^\s'\",:\]]+", lambda m: "/***/" + Path(m.group().strip("'\"")).name, msg)
     msg = re.sub(r"[^\s/\\]+\.pdf\b", "XYZ.pdf", msg, flags=re.IGNORECASE)
     msg = re.sub(r"[^\s/\\]+\.md\b", "XYZ.md", msg, flags=re.IGNORECASE)

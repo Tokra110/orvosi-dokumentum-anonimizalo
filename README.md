@@ -54,7 +54,7 @@ python scripts/export_tableformer_onnx.py
 
 ## Release builds
 
-`packaging/` holds the PyInstaller, RPM, and Inno Setup definitions. `.github/workflows/release.yml` builds Linux (tar.gz + rpm) and Windows artifacts on version tags. Windows users can choose the standard per-user installer (`*-setup.exe`) or a portable zip. The installer adds a Start menu shortcut, supports normal Windows uninstall, and optionally creates a desktop shortcut. Bundles ship without models; the in-app downloader fetches them on first run.
+`packaging/` holds the PyInstaller, RPM, and Inno Setup definitions. `.github/workflows/release.yml` builds Linux (tar.gz + rpm) and Windows artifacts on version tags. Windows users can choose the standard per-user installer (`*-setup.exe`) or a portable zip. The installer adds a Start menu shortcut, supports normal Windows uninstall, and optionally creates a desktop shortcut. Bundles ship without models; the in-app downloader fetches them on first run. On Windows, downloaded models and diagnostic logs live beside the installed executable under `models\` and `logs\`. Versions installed before 0.1.4 automatically move existing models from the previous per-user data directory.
 
 ## Model attribution
 
