@@ -10,7 +10,12 @@ PDF_LIMIT_ENV = "MEDICAL_REDACTOR_TEST_PDF_LIMIT"
 
 _TAJ_RE = re.compile(r"\b(\d{3})[-\s]?(\d{3})[-\s]?(\d{3})\b")
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-_PHONE_RE = re.compile(r"(?:\+36|06)[-\s.]?(?:1|[2-9]\d)[-\s.]?\d{3}[-\s.]?\d{2,4}")
+_PHONE_RE = re.compile(
+    r"(?:\+36|06)[-\s.]?(?:1|[2-9]\d)[-\s.]?\d{3}[-\s.]?\d{2,4}"
+    r"|\b(?:20|30|31|50|70)\s?/\s?\d{3}[-\s.]?\d{4}\b"
+    r"|\(\s*(?:06|1|[2-9]\d)\s*\)\s*\d{2}\s*[-–—]\s*\d{3}\s*[-–—]\s*\d{3,4}\b"
+    r"|\b(?:1|[2-9]\d)\s*/\s*\d{3}\s*[-–—]\s*\d{3,4}(?:\s*/\s*\d{1,4})?\b"
+)
 
 
 def _validate_taj(d1: str, d2: str, d3: str) -> bool:

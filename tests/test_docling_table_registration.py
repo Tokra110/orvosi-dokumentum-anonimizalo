@@ -142,6 +142,32 @@ def test_windows_converter_uses_pdfium_backend(monkeypatch):
     )
 
 
+def test_windows_converter_preflights_layout_model_cache(monkeypatch):
+    from pathlib import Path
+
+    from huggingface_hub import constants
+    from huggingface_hub.file_download import repo_folder_name
+
+    import redactor
+
+    checked = []
+    monkeypatch.setattr(redactor, "_is_windows", lambda: True)
+    monkeypatch.setattr(
+        "huggingface_hub.file_download.are_symlinks_supported",
+        lambda cache_dir: checked.append(Path(cache_dir)) or False,
+    )
+
+    redactor.build_docling_converter()
+
+    assert checked == [
+        Path(constants.HF_HUB_CACHE)
+        / repo_folder_name(
+            repo_id="docling-project/docling-layout-heron-onnx",
+            repo_type="model",
+        )
+    ]
+
+
 def test_onnx_docling_converter_extracts_markdown_table(generated_medical_pdf):
     from redactor import build_docling_converter, convert_pdf
 

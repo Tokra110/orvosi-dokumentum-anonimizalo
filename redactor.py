@@ -57,9 +57,14 @@ _TAJ_CONTEXT_RE = re.compile(
 )
 
 _PHONE_RE = re.compile(
-    # +36/06-prefixed numbers, or bare mobile numbers like "30/482-7035"
+    # +36/06-prefixed numbers, bare mobile numbers like "30/482-7035",
+    # and institutional landlines emitted by medical forms. Those commonly use
+    # either a parenthesized area code or area/subscriber slash notation. The
+    # final slash group is an extension, not part of another identifier.
     r"(?:\+36|06)[-\s.]?(?:1|[2-9]\d)[-\s.]?\d{3}[-\s.]?\d{2,4}"
     r"|\b(?:20|30|31|50|70)\s?/\s?\d{3}[-\s.]?\d{4}\b"
+    r"|\(\s*(?:06|1|[2-9]\d)\s*\)\s*\d{2}\s*[-–—]\s*\d{3}\s*[-–—]\s*\d{3,4}\b"
+    r"|\b(?:1|[2-9]\d)\s*/\s*\d{3}\s*[-–—]\s*\d{3,4}(?:\s*/\s*\d{1,4})?\b"
 )
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
@@ -80,7 +85,7 @@ _STREET_TYPES = (
     r"d[uű]l[oő]|major|telep|lak[oó]telep|s[eé]t[aá]ny|rakpart)"
 )
 _ADDRESS_STREET_RE = re.compile(
-    rf"\b[A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]+\s+{_STREET_TYPES}\s+\d+[./\-]?\s*\d*",
+    rf"\b[A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]+\s+{_STREET_TYPES}\s*\d+[./\-]?\s*\d*",
     re.IGNORECASE,
 )
 _POSTAL_CITY_RE = re.compile(r"\b[1-9]\d{3}\s+[A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]+")
@@ -414,37 +419,138 @@ def _find_ner_pii(text: str, ner_pipeline) -> list[PiiSpan]:
 def _drop_isolated_midword_spans(
     text: str, ner_spans: list[PiiSpan], regex_spans: list[PiiSpan]
 ) -> list[PiiSpan]:
-    """Drop NER spans that cut into a word with no supporting span nearby.
+    """Reject partial-word NER noise without leaking inflected PII.
 
-    Mid-word NER spans come in two kinds: fragments of real names (the rest
-    of the name is covered by an adjacent NER fragment or a regex span) and
-    tokenizer noise that eats clinical words ("Mo|unjaro", "Ro|wachol").
-    Only short spans are candidates: the observed noise is always <= 4 chars,
-    while longer mid-word fragments ("Rádi Fan|ni") are real names whose
-    removal would leak — verified on the private corpus, where dropping
-    longer isolated fragments exposed two real names.
+    The model can split one entity into adjacent pieces. Consider those
+    pieces together before deciding whether they cover a complete word.
+    Unsupported fragments inside one word are unsafe to trust because they
+    corrupt clinical terms such as ``Par|ath|ormon`` and ``M|ko``.
+
+    Hungarian locations and names often carry a case suffix. When the model
+    finds the entity stem and leaves only a known suffix, expand the redaction
+    through the suffix. Multi-word names are expanded to their word boundary
+    as well so a fragmented surname cannot leak.
     """
 
     def is_word(c: str) -> bool:
         return c.isalnum()
 
+    suffixes = {
+        "n",
+        "on",
+        "en",
+        "ön",
+        "ra",
+        "re",
+        "ára",
+        "ére",
+        "ba",
+        "be",
+        "ban",
+        "ben",
+        "ból",
+        "ből",
+        "ról",
+        "ről",
+        "tól",
+        "től",
+        "nál",
+        "nél",
+        "hoz",
+        "hez",
+        "höz",
+        "nak",
+        "nek",
+        "val",
+        "vel",
+        "ért",
+        "ig",
+        "kor",
+        "ként",
+        "vá",
+        "vé",
+    }
+
+    components: list[list[PiiSpan]] = []
+    for span in sorted(ner_spans, key=lambda item: (item.start, item.end)):
+        if (
+            components
+            and components[-1][-1].label == span.label
+            and span.start <= max(item.end for item in components[-1])
+        ):
+            components[-1].append(span)
+        else:
+            components.append([span])
+
     kept: list[PiiSpan] = []
-    for s in ner_spans:
-        if s.end - s.start > 4:
-            kept.append(s)
-            continue
-        mid_start = s.start > 0 and is_word(text[s.start - 1]) and is_word(text[s.start])
-        mid_end = s.end < len(text) and is_word(text[s.end - 1]) and is_word(text[s.end])
+    for component in components:
+        start = min(span.start for span in component)
+        end = max(span.end for span in component)
+        mid_start = start > 0 and is_word(text[start - 1]) and is_word(text[start])
+        mid_end = end < len(text) and is_word(text[end - 1]) and is_word(text[end])
+
         if not (mid_start or mid_end):
-            kept.append(s)
+            kept.extend(component)
             continue
-        supported = any(
-            o is not s and o.start - 2 <= s.end and s.start <= o.end + 2
-            for o in (*ner_spans, *regex_spans)
+
+        if any(r.start <= start and end <= r.end for r in regex_spans):
+            continue
+
+        word_start = start
+        while word_start > 0 and is_word(text[word_start - 1]):
+            word_start -= 1
+        word_end = end
+        while word_end < len(text) and is_word(text[word_end]):
+            word_end += 1
+
+        component_text = text[start:end]
+        trailing = text[end:word_end].casefold()
+        is_inflected_entity = (
+            not mid_start
+            and bool(trailing)
+            and trailing in suffixes
+            and component[0].label in {"NAME", "LOCATION"}
         )
-        if supported:
-            kept.append(s)
+        is_fragmented_multiword_name = (
+            component[0].label == "NAME"
+            and any(char.isspace() for char in component_text)
+        )
+
+        if is_inflected_entity or is_fragmented_multiword_name:
+            kept.append(
+                PiiSpan(
+                    word_start,
+                    word_end,
+                    component[0].label,
+                    text[word_start:word_end],
+                    score=max((span.score or 0.0) for span in component),
+                )
+            )
     return kept
+
+
+def _collapse_repeated_table_row_cells(markdown: str) -> str:
+    """Keep a full-width table note once instead of repeating every cell."""
+    lines = markdown.splitlines(keepends=True)
+    collapsed: list[str] = []
+    for line in lines:
+        ending = "\n" if line.endswith("\n") else ""
+        content = line[:-1] if ending else line
+        if content.endswith("\r"):
+            content = content[:-1]
+            ending = "\r" + ending
+
+        if content.startswith("|") and content.endswith("|"):
+            cells = [cell.strip() for cell in content[1:-1].split("|")]
+            if (
+                len(cells) >= 3
+                and len(cells[0]) >= 12
+                and all(cell == cells[0] for cell in cells)
+                and set(cells[0]) != {"-"}
+            ):
+                content = "| " + cells[0] + " |" + " |" * (len(cells) - 1)
+        collapsed.append(content + ending)
+    return "".join(collapsed)
 
 
 _BARE_STAMP_RE = re.compile(r"\b[A-Z]?\d{5,6}\b")
@@ -612,6 +718,9 @@ def build_docling_converter():
     )
     pipeline_options.ocr_options = RapidOcrOptions(backend="onnxruntime", lang=["english"])
 
+    if _is_windows():
+        _preflight_windows_hf_cache(pipeline_options.layout_options)
+
     pdf_format_option = PdfFormatOption(pipeline_options=pipeline_options)
     if _is_windows():
         # The docling-parse backend depends on a large external resource tree.
@@ -630,6 +739,30 @@ def build_docling_converter():
             InputFormat.PDF: pdf_format_option,
         }
     )
+
+
+def _preflight_windows_hf_cache(layout_options) -> None:
+    """Finish the Windows symlink check before HF starts parallel downloads."""
+    from pathlib import Path
+
+    from huggingface_hub import constants
+    from huggingface_hub.file_download import (
+        are_symlinks_supported,
+        repo_folder_name,
+    )
+
+    engine_type = layout_options.engine_options.engine_type
+    engine_config = layout_options.model_spec.engine_overrides.get(engine_type)
+    repo_id = (
+        engine_config.repo_id
+        if engine_config is not None and engine_config.repo_id
+        else layout_options.model_spec.repo_id
+    )
+    cache_dir = Path(constants.HF_HUB_CACHE) / repo_folder_name(
+        repo_id=repo_id,
+        repo_type="model",
+    )
+    are_symlinks_supported(cache_dir)
 
 
 # --- NER model loading ---
@@ -658,7 +791,7 @@ def process_file_detailed(
     if on_stage:
         on_stage("converting")
 
-    markdown = convert_pdf(pdf_path, converter)
+    markdown = _collapse_repeated_table_row_cells(convert_pdf(pdf_path, converter))
 
     if log:
         log(f"  {len(markdown)} chars extracted. Detecting PII...")

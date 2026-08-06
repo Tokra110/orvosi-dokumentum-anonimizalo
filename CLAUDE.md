@@ -86,9 +86,10 @@ Per-file processing order:
    - Layout is forced through Docling's ONNX Runtime layout engine.
    - Table structure uses the app-local ONNX TableFormer adapter registered before `DocumentConverter()` is built.
    - OCR uses RapidOCR's ONNX Runtime backend (`english` model; lightweight Latin OCR).
+   - Identical full-width table cells emitted for one spanning note are collapsed so the note appears once in Markdown.
 2. **NER** runs first (`_find_ner_pii`): ONNX HuBERT detects PER, LOC, ORG in 800-char chunks with 200-char overlap. A second pass shifted by half a stride heals entities cut or context-starved at pass-1 chunk boundaries; pass-2 hits are only accepted within 100 chars of a pass-1 boundary (interior pass-2-only hits are mostly noise — observed eating lab analyte names like "Nátrium"). Entities below `_NER_MIN_SCORE` (0.7, corpus-calibrated — see the comment on the constant before changing) are discarded. NER is ~25% of per-file time; conversion dominates.
 3. **Regex** runs second (`_find_regex_pii`): TAJ (with checksum), phones, emails, birth dates (context-sensitive), addresses, names near field labels (title-case AND all-caps), Dr.-prefixed/suffixed names, clinician-title-suffixed names ("X Y Optometrista"), "részére"-anchored names, doctor stamp IDs (EESZT), company IDs (cégjegyzékszám, adószám), record IDs (naplószám, sorszám, munkaszám, védettségi igazolvány szám)
-4. **Noise filter**: `_drop_isolated_midword_spans` removes NER spans ≤4 chars that cut into a word with no supporting span within 2 chars (kills "Mo|unjaro"-style drug/analyte eating; longer mid-word fragments are real names and must stay — dropping them leaked on the corpus)
+4. **Noise filter**: `_drop_isolated_midword_spans` groups adjacent NER fragments before evaluating them. Unsupported fragments that cut into one word are rejected so clinical terms such as `Par|ath|ormon` and `M|ko` survive. Fragmented multi-word names remain redacted, and recognized Hungarian suffixes on names/locations are included so inflected PII is removed without leaving suffix fragments.
 5. **Merge** spans (NER takes priority on overlap since it runs first)
 6. **Name-adjacent ID sweep**: `_find_ids_near_names` redacts bare 5-6 digit stamp IDs within 60 chars of any NAME span (doctor stamps float before/after/below the name in the wild), then a final merge
 7. **Redact** replaces spans with typed placeholders like `[REDACTED_NAME]`, `[REDACTED_TAJ]`
@@ -118,7 +119,7 @@ Per-file processing order:
 - **TAJ szam**: `\d{3}[-\s]?\d{3}[-\s]?\d{3}` with checksum validation (weights [3,7,3,7,3,7,3,7], mod 10)
 - **Names**: matched by 30+ Hungarian field label keywords (beteg neve, anyja neve, szuletesi neve, etc.) with accent-flexible regex (`[eé]`, `[aá]`, `[uü]`). Supports names across line breaks, hyphens, dots.
 - **Addresses**: street type suffixes (utca, ut, ter, korut, etc.) + postal code patterns
-- **Phones**: +36/06 prefix patterns, plus bare mobile forms like `30/482-7035` (slash-separated, no prefix)
+- **Phones**: +36/06 prefix patterns, bare mobile forms like `30/482-7035`, parenthesized landlines like `(06) 31-234-567`, and institutional slash forms like `47/234 - 567/123` (including extensions)
 - **Name parts regex**: `_HU_NAME_PART` matches capitalized Hungarian words including married suffix "ne". `_HU_FULL_NAME` matches 2-5 parts separated by spaces, hyphens, en/em dashes, or dots.
 - **Dr. names**: `_DR_PREFIX_NAME_RE` / `_DR_SUFFIX_NAME_RE` catch "Dr. Fekete Éva", "Dr.Homonai", "Fekete Éva Dr." as a deterministic backstop for NER. Separators deliberately exclude newlines so the pattern can't swallow the first word of the next sentence.
 - **Doctor stamp IDs** (`DOCTOR_ID`): "EESZT: O43048", parenthesized IDs after a name ("(azonosító: 220756)", "(36563)"), and bare letter+5-digit stamps after a name ("Fekete Éva  O43048 adjunktus"). Doctor names are redacted, so the publicly searchable stamp ID must go too or the doctor is re-identifiable.

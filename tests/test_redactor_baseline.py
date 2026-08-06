@@ -88,6 +88,26 @@ def _regex_redact(markdown: str) -> str:
     return _redact(markdown, _merge_spans(_find_regex_pii(markdown)))
 
 
+def test_parenthesized_landline_and_fax_numbers_are_redacted():
+    redacted = _regex_redact(
+        "Tel.: (06) 31-234-567, Fax: (45) 62-345-678\n"
+    )
+
+    assert "(06) 31-234-567" not in redacted
+    assert "(45) 62-345-678" not in redacted
+    assert redacted.count("[REDACTED_PHONE]") == 2
+
+
+def test_slash_landlines_and_extensions_are_redacted():
+    redacted = _regex_redact(
+        "Elérhetőség (telefon) MSZ:47/234 - 567, FGY:46/345 - 678/123\n"
+    )
+
+    assert "47/234 - 567" not in redacted
+    assert "46/345 - 678/123" not in redacted
+    assert redacted.count("[REDACTED_PHONE]") == 2
+
+
 def test_dr_prefixed_names_are_redacted_without_ner():
     redacted = _regex_redact(
         "## Dr.Homonai\n\nBeutaló: dr.Badalay Rob\n\nKonzulens orvos: Dr. Fekete Éva\n"
@@ -265,6 +285,69 @@ def test_isolated_midword_ner_span_is_dropped_but_supported_kept():
     kept = _drop_isolated_midword_spans(text, [lone_mid, frag_a, frag_b], [])
     assert lone_mid not in kept
     assert frag_a in kept and frag_b in kept
+
+
+def test_partial_word_ner_fragments_do_not_redact_medical_terms():
+    from redactor import PiiSpan, _drop_isolated_midword_spans
+
+    text = "Parathormon és Mko boka"
+    spans = [
+        PiiSpan(0, 3, "LOCATION", "Par", score=0.93),
+        PiiSpan(3, 6, "LOCATION", "ath", score=0.97),
+        PiiSpan(15, 16, "NAME", "M", score=0.93),
+    ]
+
+    assert _drop_isolated_midword_spans(text, spans, []) == []
+
+
+def test_address_without_space_before_house_number_is_redacted():
+    redacted = _regex_redact("Lakcím: Budapest, Etele út18")
+
+    assert "Etele" not in redacted
+    assert "út18" not in redacted
+    assert "[REDACTED_ADDRESS]" in redacted
+
+
+def test_inflected_location_is_redacted_through_hungarian_suffix():
+    from redactor import PiiSpan, _drop_isolated_midword_spans, _redact
+
+    text = "Nyíregyházára küldve"
+    spans = [
+        PiiSpan(0, 8, "LOCATION", "Nyíregy", score=0.98),
+        PiiSpan(8, 11, "LOCATION", "ház", score=0.94),
+    ]
+
+    kept = _drop_isolated_midword_spans(text, spans, [])
+
+    assert _redact(text, kept) == "[REDACTED_LOCATION] küldve"
+
+
+def test_fragmented_multiword_name_expands_to_word_boundary():
+    from redactor import PiiSpan, _drop_isolated_midword_spans, _redact
+
+    text = "Rádi Fanni lelete"
+    spans = [PiiSpan(0, 8, "NAME", "Rádi Fan", score=0.73)]
+
+    kept = _drop_isolated_midword_spans(text, spans, [])
+
+    assert _redact(text, kept) == "[REDACTED_NAME] lelete"
+
+
+def test_repeated_full_width_table_note_is_kept_once():
+    from redactor import _collapse_repeated_table_row_cells
+
+    markdown = (
+        "| Vizsgálat | Eredmény | Státusz |\n"
+        "|---|---|---|\n"
+        "| Nyíregyházára küldve. | Nyíregyházára küldve. | Nyíregyházára küldve. |\n"
+        "| Nátrium | 139 mmol/L | VALIDÁLT |\n"
+    )
+
+    collapsed = _collapse_repeated_table_row_cells(markdown)
+
+    assert collapsed.count("Nyíregyházára küldve.") == 1
+    assert "|---|---|---|" in collapsed
+    assert "| Nátrium | 139 mmol/L | VALIDÁLT |" in collapsed
 
 
 def test_institution_codes_are_not_taj_redacted():

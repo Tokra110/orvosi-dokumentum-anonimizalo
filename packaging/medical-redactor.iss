@@ -47,8 +47,16 @@ Name: "hungarian"; MessagesFile: "compiler:Languages\Hungarian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-english.RemoveDownloadedModelsPrompt=Also remove the downloaded HuBERT and TableFormer models?%n%nChoose No to keep them for a later reinstall.
-hungarian.RemoveDownloadedModelsPrompt=A letöltött HuBERT és TableFormer modellek is törlődjenek?%n%nVálassza a Nem lehetőséget, ha meg szeretné tartani őket egy későbbi újratelepítéshez.
+english.UninstallConfirmTitle=Uninstall Medical Redactor
+english.UninstallConfirmPrompt=Do you want to uninstall Medical Redactor?
+english.RemoveDownloadedModelsCheckbox=Also remove the downloaded HuBERT and TableFormer model files
+english.UninstallYesButton=&Yes
+english.UninstallNoButton=&No
+hungarian.UninstallConfirmTitle=Az Orvosi dokumentum anonimizáló eltávolítása
+hungarian.UninstallConfirmPrompt=El szeretné távolítani az Orvosi dokumentum anonimizálót?
+hungarian.RemoveDownloadedModelsCheckbox=A letöltött HuBERT és TableFormer modellfájlok is törlődjenek
+hungarian.UninstallYesButton=&Igen
+hungarian.UninstallNoButton=&Nem
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -70,18 +78,136 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 var
   RemoveDownloadedModels: Boolean;
 
+function HasCommandLineParameter(Value: String): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), Value) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function ShowUninstallConfirmation(): Boolean;
+var
+  Form: TSetupForm;
+  PromptLabel: TNewStaticText;
+  RemoveModelsCheck: TNewCheckBox;
+  YesButton: TNewButton;
+  NoButton: TNewButton;
+begin
+  Form := CreateCustomForm(ScaleX(440), ScaleY(150), False, False);
+  try
+    Form.Caption := ExpandConstant('{cm:UninstallConfirmTitle}');
+    Form.Position := poScreenCenter;
+
+    PromptLabel := TNewStaticText.Create(Form);
+    PromptLabel.Parent := Form;
+    PromptLabel.AutoSize := False;
+    PromptLabel.WordWrap := True;
+    PromptLabel.Caption := ExpandConstant('{cm:UninstallConfirmPrompt}');
+    PromptLabel.SetBounds(ScaleX(16), ScaleY(16), ScaleX(408), ScaleY(42));
+
+    RemoveModelsCheck := TNewCheckBox.Create(Form);
+    RemoveModelsCheck.Parent := Form;
+    RemoveModelsCheck.Caption := ExpandConstant(
+      '{cm:RemoveDownloadedModelsCheckbox}'
+    );
+    RemoveModelsCheck.Checked := True;
+    RemoveModelsCheck.SetBounds(
+      ScaleX(16), ScaleY(66), ScaleX(408), ScaleY(24)
+    );
+
+    YesButton := TNewButton.Create(Form);
+    YesButton.Parent := Form;
+    YesButton.Caption := ExpandConstant('{cm:UninstallYesButton}');
+    YesButton.Default := True;
+    YesButton.ModalResult := mrOk;
+    YesButton.SetBounds(ScaleX(268), ScaleY(106), ScaleX(75), ScaleY(25));
+
+    NoButton := TNewButton.Create(Form);
+    NoButton.Parent := Form;
+    NoButton.Caption := ExpandConstant('{cm:UninstallNoButton}');
+    NoButton.Cancel := True;
+    NoButton.ModalResult := mrCancel;
+    NoButton.SetBounds(ScaleX(349), ScaleY(106), ScaleX(75), ScaleY(25));
+
+    Form.ActiveControl := YesButton;
+    Result := Form.ShowModal() = mrOk;
+    RemoveDownloadedModels := RemoveModelsCheck.Checked;
+  finally
+    Form.Free();
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  UninstallKey: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    UninstallKey :=
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+      '{D328CBA3-9D65-4A28-A3D0-0267CEAEAB5B}_is1';
+    RegWriteStringValue(
+      HKCU64,
+      UninstallKey,
+      'UninstallString',
+      '"' + ExpandConstant('{uninstallexe}') + '" /SILENT'
+    );
+  end;
+end;
+
 function InitializeUninstall(): Boolean;
 var
-  Answer: Integer;
+  ResultCode: Integer;
+  RelaunchParameters: String;
 begin
-  Answer := SuppressibleMsgBox(
-    ExpandConstant('{cm:RemoveDownloadedModelsPrompt}'),
-    mbConfirmation,
-    MB_YESNOCANCEL,
-    IDYES
+  RemoveDownloadedModels := True;
+
+  if HasCommandLineParameter('/CUSTOMCONFIRMED') then
+  begin
+    RemoveDownloadedModels := not HasCommandLineParameter('/KEEPMODELS');
+    Result := True;
+    Exit;
+  end;
+
+  if HasCommandLineParameter('/VERYSILENT') or
+     HasCommandLineParameter('/SUPPRESSMSGBOXES') then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  if not ShowUninstallConfirmation() then
+  begin
+    Result := False;
+    Exit;
+  end;
+
+  if UninstallSilent() then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  RelaunchParameters := '/SILENT /CUSTOMCONFIRMED /LANG=' +
+    ExpandConstant('{language}');
+  if not RemoveDownloadedModels then
+    RelaunchParameters := RelaunchParameters + ' /KEEPMODELS';
+
+  Result := False;
+  Exec(
+    ExpandConstant('{uninstallexe}'),
+    RelaunchParameters,
+    '',
+    SW_SHOWNORMAL,
+    ewNoWait,
+    ResultCode
   );
-  Result := Answer <> IDCANCEL;
-  RemoveDownloadedModels := Answer = IDYES;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

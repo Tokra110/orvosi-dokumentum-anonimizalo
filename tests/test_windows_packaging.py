@@ -57,12 +57,19 @@ def test_inno_installer_replaces_only_the_immutable_runtime_tree():
     assert r'Type: filesandordirs; Name: "{app}\logs"' not in installer
 
 
-def test_inno_uninstaller_offers_to_remove_downloaded_models_by_default():
+def test_inno_uninstaller_uses_one_confirmation_with_model_checkbox():
     installer = (ROOT / "packaging" / "medical-redactor.iss").read_text()
 
-    assert "RemoveDownloadedModelsPrompt" in installer
-    assert "MB_YESNOCANCEL" in installer
-    assert "IDYES" in installer
+    assert "ShowUninstallConfirmation" in installer
+    assert "RemoveDownloadedModelsCheckbox" in installer
+    assert "RemoveModelsCheck.Checked := True" in installer
+    assert "YesButton.ModalResult := mrOk" in installer
+    assert "NoButton.ModalResult := mrCancel" in installer
+    assert "MB_YESNOCANCEL" not in installer
+    assert "UninstallString" in installer
+    assert "{uninstallexe}') + '\" /SILENT'" in installer
+    assert "HasCommandLineParameter('/CUSTOMCONFIRMED')" in installer
+    assert "HasCommandLineParameter('/SUPPRESSMSGBOXES')" in installer
     assert r"DelTree(ExpandConstant('{app}\models')" in installer
     assert r"{localappdata}\medical-redactor\models" in installer
     assert r"DelTree(ExpandConstant('{app}\logs')" not in installer
