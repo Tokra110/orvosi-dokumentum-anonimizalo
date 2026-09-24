@@ -13,11 +13,10 @@ xvfb-run -a .venv/bin/python main.py --release-verify /tmp/medical-redactor-rele
 .venv/bin/pyinstaller packaging/medical-redactor.spec --noconfirm && bash packaging/build_rpm.sh 0.1.0
 ```
 
-Export scripts (`scripts/export_*_onnx.py`) need a separate venv from `requirements-export.txt` (pulls torch).
-
 ## Hard rules
 
 - **Never commit private information. No session log, by policy.** `notes.md` and `plans/` are gitignored; commits use the repo's anonymous git identity.
+- Tests, comments and docs use invented names, IDs, dates and addresses only. Never copy text from a real record, not even a short line.
 - Push, tag or release only when the maintainer asks. A `v*` tag publishes a GitHub Release.
 - Python 3.13 only; 3.14 breaks the ML dependencies.
 - Never add torch, full `docling` or full `PySide6` to `requirements.txt`.
@@ -25,8 +24,7 @@ Export scripts (`scripts/export_*_onnx.py`) need a separate venv from `requireme
 - Build the Docling converter only through `build_docling_converter()`, and reuse it.
 - Every UI string goes through `gui/i18n.py` (HU default, EN).
 - New weights go to a new release tag plus manifest; never overwrite assets.
-- Do not replace the full Windows release gate with `--selftest`.
-- Check free VRAM before starting any GPU server; the GPU also drives the display.
+- Keep the full Windows release gate; `--selftest` is not a substitute.
 
 ## First gotchas
 
