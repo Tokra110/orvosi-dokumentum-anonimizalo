@@ -1,0 +1,4 @@
+# Packaging-time deps (PyInstaller bundles, rpm). Not part of the runtime venv
+# contract; install on top of requirements.txt when building release artifacts.
+-r requirements.txt
+pyinstaller>=6.10

@@ -1,0 +1,40 @@
+# Binary rpm wrapping the prebuilt PyInstaller onedir bundle.
+# Build via packaging/build_rpm.sh (it sets _bundle_dir/_pkgsrc_dir/version).
+
+Name:           medical-redactor
+Version:        %{?version}%{!?version:0.1.0}
+Release:        1%{?dist}
+Summary:        Redact PII from Hungarian medical PDFs
+License:        MIT
+BuildArch:      x86_64
+
+# The bundle carries its own libpython/Qt/onnxruntime; rpm's automatic
+# dependency scanner would otherwise demand system copies of all of them.
+AutoReqProv:    no
+%global debug_package %{nil}
+%global __brp_mangle_shebangs %{nil}
+%global __brp_strip %{nil}
+%global __brp_strip_static_archive %{nil}
+%global _build_id_links none
+
+%description
+Desktop app that converts Hungarian medical PDF records to redacted
+markdown. Removes patient PII (names, TAJ numbers, addresses, phones,
+emails, birth dates) with an ONNX HuBERT NER model plus Hungarian-specific
+regex patterns. Model artifacts are downloaded in-app on first run.
+
+%install
+mkdir -p %{buildroot}/usr/lib/medical-redactor
+cp -a %{_bundle_dir}/. %{buildroot}/usr/lib/medical-redactor/
+mkdir -p %{buildroot}/usr/bin
+ln -s /usr/lib/medical-redactor/medical-redactor %{buildroot}/usr/bin/medical-redactor
+install -D -m 0644 %{_pkgsrc_dir}/medical-redactor.desktop \
+    %{buildroot}/usr/share/applications/medical-redactor.desktop
+install -D -m 0644 %{_pkgsrc_dir}/../assets/icon.svg \
+    %{buildroot}/usr/share/icons/hicolor/scalable/apps/medical-redactor.svg
+
+%files
+/usr/lib/medical-redactor
+/usr/bin/medical-redactor
+/usr/share/applications/medical-redactor.desktop
+/usr/share/icons/hicolor/scalable/apps/medical-redactor.svg

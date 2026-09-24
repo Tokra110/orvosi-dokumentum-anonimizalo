@@ -1,0 +1,95 @@
+{
+  "models": [
+    {
+      "name": "hubert-ner-onnx",
+      "description": "Hungarian HuBERT NER (ONNX, fp32)",
+      "approx_size_mb": 441,
+      "base_url": "https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/download/models-v1",
+      "files": [
+        {
+          "name": "model.onnx",
+          "bytes": 440366911,
+          "sha256": "965ca2ed25e050765a8a465c62b58b7e73769a64c62a5c3487021c6f9bf6129b"
+        },
+        {
+          "name": "config.json",
+          "bytes": 999,
+          "sha256": "c96be6033da6d0921b00fb8356a043e9fca9338fe9cfc85e61ae41e5c29eb9e7"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 775747,
+          "sha256": "464f917e97aa6f96a10af4f9f17351b4fb4ba0986270982caf864f8e50690d2d"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 1325,
+          "sha256": "8a258f1974ae99e9f0b228fb974321a7f755f93c9af237657f6834fce7b4a929"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 695,
+          "sha256": "5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a"
+        },
+        {
+          "name": "vocab.txt",
+          "bytes": 272107,
+          "sha256": "0e29d346cae270e084ef33707dd57194e76a8d2af4601d594f675672d5388d55"
+        },
+        {
+          "name": "labels.json",
+          "bytes": 144,
+          "sha256": "752f853ec79adb3253e98c06eb3e900bbe985024ee9e9a3b83711761c878d600"
+        }
+      ]
+    },
+    {
+      "name": "tableformer-onnx",
+      "description": "Docling TableFormer table structure (ONNX)",
+      "approx_size_mb": 214,
+      "base_url": "https://github.com/Tokra110/orvosi-dokumentum-anonimizalo/releases/download/models-v1",
+      "files": [
+        {
+          "name": "encoder.onnx",
+          "bytes": 559731,
+          "sha256": "21a4b16e5305fbb6773e681fad0b0db0bf47846d080d9c14265e9c5be4e85a2d"
+        },
+        {
+          "name": "encoder.onnx.data",
+          "bytes": 95158272,
+          "sha256": "ac35074b663e7473e4dfa56385363d0320e839a6e27c85bf1e589e903e69e022"
+        },
+        {
+          "name": "decoder_step.onnx",
+          "bytes": 845276,
+          "sha256": "a99d7ff41c2915ccac5bd56c9f035f755751bcbe14a32d2182201f38072deba2"
+        },
+        {
+          "name": "decoder_step.onnx.data",
+          "bytes": 77856768,
+          "sha256": "a3b67143919dc830d5217493d8fbbfa2cedd2ed1cbca857f0dc653a817f8e526"
+        },
+        {
+          "name": "bbox_decoder.onnx",
+          "bytes": 71384,
+          "sha256": "477a65bc6472a7028feb6125fa01a474abd01fe6b7093fcebe45df44d16b0843"
+        },
+        {
+          "name": "bbox_decoder.onnx.data",
+          "bytes": 39649280,
+          "sha256": "926e28025d8ba150e50f4dd595e2e2363010cb9ede85210311378d2749788943"
+        },
+        {
+          "name": "word_map.json",
+          "bytes": 178,
+          "sha256": "60fab261eaaa0dd1d9e865601303f85e28142e628a84cba02c298a390c327b56"
+        },
+        {
+          "name": "tm_config.json",
+          "bytes": 7060,
+          "sha256": "984e122ceb8ccf84d84c9d2882f6f2302a44b4f1e577babd6289892c36f3cffd"
+        }
+      ]
+    }
+  ]
+}

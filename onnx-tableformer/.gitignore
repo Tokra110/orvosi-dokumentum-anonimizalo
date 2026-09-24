@@ -1,0 +1,4 @@
+*.onnx
+*.onnx.data
+word_map.json
+__pycache__/

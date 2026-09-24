@@ -1,0 +1,95 @@
+import os
+import sys
+import logging
+from pathlib import Path
+
+# Route file dialogs through the XDG desktop portal so the desktop's own
+# file picker (Dolphin on KDE, Nautilus on GNOME, ...) is used instead of
+# Qt's built-in dialog. PySide6 bundles its own Qt, so distro theme plugins
+# like plasma-integration can't load into it; the portal is the
+# desktop-agnostic path. Qt falls back to its own dialog if no portal runs.
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")
+
+from diagnostics import configure_file_logging
+
+configure_file_logging()
+
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication
+
+from gui.main_window import MainWindow
+from gui.theme import APP_QSS
+
+ICON_PATH = Path(__file__).resolve().parent / "assets" / "icon.svg"
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("Orvosi dokumentum anonimizáló")
+    app.setDesktopFileName("medical-redactor")
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
+    app.setStyleSheet(APP_QSS)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+def selftest() -> int:
+    """Headless check that a frozen bundle has everything wired: heavy
+    imports resolve, the platform PDF backend initializes, the converter
+    builds, and (if model artifacts are installed) the ONNX NER pipeline
+    runs. No GUI, no display needed."""
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PictureDescriptionVlmEngineOptions
+    from docling.models.factories import get_picture_description_factory
+    from medical_redactor_onnx import paths
+    from redactor import build_docling_converter
+
+    converter = build_docling_converter()
+    picture_factory = get_picture_description_factory()
+    if PictureDescriptionVlmEngineOptions not in picture_factory.classes:
+        raise RuntimeError("docling built-in plugin registry is incomplete")
+    print("selftest: docling plugin registry OK")
+
+    pdf_backend = converter.format_to_options[InputFormat.PDF].backend
+    if sys.platform.startswith("win"):
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+
+        if pdf_backend is not PyPdfiumDocumentBackend:
+            raise RuntimeError(f"unexpected Windows PDF backend: {pdf_backend}")
+        print("selftest: Windows PDFium backend OK")
+    else:
+        from docling_parse.pdf_parser import DoclingPdfParser
+
+        DoclingPdfParser()
+        print("selftest: docling PDF parser resources OK")
+    print("selftest: docling converter OK")
+    try:
+        model_dir = paths.hubert_ner_dir(require=True)
+    except FileNotFoundError:
+        print(f"selftest: NER models not installed at {paths.get_model_dir()} "
+              "(expected for a lean bundle) — skipping NER check")
+        return 0
+    from medical_redactor_onnx.ner_onnx import OnnxNerPipeline
+
+    entities = OnnxNerPipeline(model_dir)("Kovács Béláné Budapesten él.")
+    print(f"selftest: NER OK ({len(entities)} entities)")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
+    if "--release-verify" in sys.argv:
+        logger = logging.getLogger("release_verification")
+        try:
+            argument_index = sys.argv.index("--release-verify") + 1
+            work_dir = Path(sys.argv[argument_index])
+            from release_harness import run_release_verification
+
+            sys.exit(run_release_verification(work_dir))
+        except Exception:
+            logger.exception("Installed release verification failed")
+            raise
+    main()

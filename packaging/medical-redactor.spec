@@ -1,0 +1,57 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec: lean onedir bundle (no model artifacts).
+
+Models are downloaded in-app on first run (gui/models_dialog.py) into the
+per-user data dir (paths.py handles sys.frozen). Docling's layout + OCR
+models are fetched by docling itself into the Hugging Face cache.
+
+Build:  .venv/bin/pyinstaller packaging/medical-redactor.spec --noconfirm
+"""
+
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
+
+datas = [
+    ("../models_manifest.json", "."),
+    ("../assets", "assets"),
+]
+# RapidOCR ships its ONNX models + yaml config as package data and imports
+# lazily (only when a scanned page needs OCR), so nothing pulls it in
+# automatically.
+datas += collect_data_files("rapidocr")
+# docling-parse's compiled PDF parser looks up character maps and encoding
+# tables at runtime. PyInstaller detects the extension module but not these
+# adjacent package resources.
+datas += collect_data_files("docling_parse")
+# Docling discovers its built-in model factories through the `docling`
+# package entry point declared by the docling-slim distribution.
+datas += copy_metadata("docling-slim")
+
+hiddenimports = collect_submodules("rapidocr")
+hiddenimports += ["docling.models.plugins.defaults"]
+
+a = Analysis(
+    ["../main.py"],
+    pathex=[".."],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    excludes=["tkinter", "torch", "torchvision", "FixTk"],
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    exclude_binaries=True,
+    name="medical-redactor",
+    console=False,
+    icon="../assets/icon.ico",
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    name="medical-redactor",
+)

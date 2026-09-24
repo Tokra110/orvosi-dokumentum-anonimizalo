@@ -1,0 +1,21 @@
+# venvs and caches
+.venv*/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# model artifacts (downloaded/exported locally, hosted separately)
+models/*
+!models/.gitkeep
+
+# spike-era ONNX artifacts (regenerable via onnx-tableformer/export_onnx.py)
+onnx-tableformer/*.onnx
+onnx-tableformer/*.onnx.data
+
+# build outputs
+dist/
+build/
+
+# private-by-policy: session logs and planning docs must never be committed
+notes.md
+plans/

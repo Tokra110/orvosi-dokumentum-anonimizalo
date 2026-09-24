@@ -1,0 +1,119 @@
+# Manual runs build and fully verify a non-publishing Windows candidate.
+# On a v* tag, the same Windows gate plus Linux packaging must pass before
+# lean bundles are attached to a GitHub Release.
+
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install build deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y rpm libegl1
+          pip install -r requirements-build.txt
+      - name: Build bundle
+        run: pyinstaller packaging/medical-redactor.spec --noconfirm
+      - name: Selftest bundle
+        run: ./dist/medical-redactor/medical-redactor --selftest
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          tar -C dist -czf "dist/medical-redactor-$VERSION-linux-x86_64.tar.gz" medical-redactor
+          bash packaging/build_rpm.sh "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.tar.gz
+            dist/*.rpm
+
+  windows:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install build deps
+        run: pip install -r requirements-build.txt
+      - name: Build bundle
+        run: pyinstaller packaging/medical-redactor.spec --noconfirm
+      - name: Selftest bundle
+        shell: bash
+        run: ./dist/medical-redactor/medical-redactor.exe --selftest
+      - name: Install installer compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Resolve candidate version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          else {
+            $version = "9999.0.0-candidate.$env:GITHUB_RUN_NUMBER"
+          }
+          $numericVersion = ($version -split "-", 2)[0]
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "numeric=$numericVersion" >> $env:GITHUB_OUTPUT
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}" `
+            "/DMyAppNumericVersion=${{ steps.version.outputs.numeric }}" `
+            "packaging\medical-redactor.iss"
+      - name: Verify installed Windows application
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $installer = Get-ChildItem "dist\*-setup.exe" | Select-Object -First 1
+          .\scripts\verify_windows_installer.ps1 `
+            -CandidateInstaller $installer.FullName `
+            -Repository "${{ github.repository }}" `
+            -WorkRoot (Join-Path $env:RUNNER_TEMP "medical-redactor-full-verification")
+      - name: Package portable bundle
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd dist && 7z a "medical-redactor-$VERSION-windows-x86_64.zip" medical-redactor
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
+
+  release:
+    needs: [linux, windows]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.linux.result == 'success' &&
+      needs.windows.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
